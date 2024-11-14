@@ -1,0 +1,17 @@
+n_week : nombre de semaine
+n_group : nombre de groupe
+n_player_per_group : nombre de joueur par groupe
+n_total_player = n_player_per_group * n_group
+
+W = {1..n_week}
+G = {1..n_group}
+P = {1..n_total_player}
+
+S = {1..n_week, 1..n_group} # S_ij -> groupe j de la semaine i
+
+∀i∈W, ∀j∈G S_ij ⊆ P
+
+∀i∈W, ∀j∈G | S_ij | = n_player_per_group
+
+∀w∈W, g1∈G,g2∈G g1<g2 → S_wg1 ∩ S_wg2 = ∅
+l
