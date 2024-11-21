@@ -36,6 +36,44 @@ class SetSolver:
     def add_constraint(self, constraint_type: str, *args):
         self.constraints.append((constraint_type, args))
 
+    def _filter_union(self, H: SetVariable, F: SetVariable, G: SetVariable) -> bool:
+        changed = False
+
+        # Update bounds
+        new_H_lower = F.lower_bound.union(G.lower_bound)
+        if new_H_lower != H.lower_bound:
+            H.lower_bound = new_H_lower
+            changed = True
+
+        new_H_upper = F.upper_bound.union(G.upper_bound)
+        if new_H_upper != H.upper_bound:
+            H.upper_bound = new_H_upper
+            changed = True
+
+        #cardinality
+
+        return changed
+
+    def _filter_intersection(
+        self, H: SetVariable, F: SetVariable, G: SetVariable
+    ) -> bool:
+        changed = False
+
+        # Update bounds
+        new_H_lower = F.lower_bound.intersection(G.lower_bound)
+        if new_H_lower != H.lower_bound:
+            H.lower_bound = new_H_lower
+            changed = True
+
+        new_H_upper = F.upper_bound.intersection(G.upper_bound)
+        if new_H_upper != H.upper_bound:
+            H.upper_bound = new_H_upper
+            changed = True
+
+
+
+        return changed
+
     def _filter_subset(self, F: SetVariable, G: SetVariable) -> bool:
         changed = False
 
@@ -163,6 +201,18 @@ class SetSolver:
                     )
                 elif constraint_type == "difference":
                     changed = changed or self._filter_difference(
+                        self.variables[args[0]],
+                        self.variables[args[1]],
+                        self.variables[args[2]],
+                    )
+                elif constraint_type == "union":
+                    changed = changed or self._filter_union(
+                        self.variables[args[0]],
+                        self.variables[args[1]],
+                        self.variables[args[2]],
+                    )
+                elif constraint_type == "intersection":
+                    changed = changed or self._filter_intersection(
                         self.variables[args[0]],
                         self.variables[args[1]],
                         self.variables[args[2]],
