@@ -20,3 +20,10 @@ group(1..groups).
    W1 < W2.
 
 #show assign/3.
+
+
+% pip install clingo
+% Enumérer une solution
+% python -m clingo 1 asp/sgp.lp
+% Obtenir le nombre de solution
+% python -m clingo 0 asp/sgp.lp --quiet
