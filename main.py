@@ -39,18 +39,25 @@ class SetSolver:
     def _filter_union(self, H: SetVariable, F: SetVariable, G: SetVariable) -> bool:
         changed = False
 
-        # Update bounds
-        new_H_lower = F.lower_bound.union(G.lower_bound)
-        if new_H_lower != H.lower_bound:
-            H.lower_bound = new_H_lower
+        new_G_lower = G.lower_bound.union(H.lower_bound)
+        if new_G_lower != G.lower_bound:
+            G.lower_bound = new_G_lower
             changed = True
 
-        new_H_upper = F.upper_bound.union(G.upper_bound)
-        if new_H_upper != H.upper_bound:
-            H.upper_bound = new_H_upper
+        new_G_upper = G.upper_bound.union(H.upper_bound)
+        if new_G_upper != G.upper_bound:
+            G.upper_bound = new_G_upper
             changed = True
 
-        #cardinality
+        new_G_max = min(G.max_card, len(G.upper_bound))
+        if new_G_max != G.max_card:
+            G.max_card = new_G_max
+            changed = True
+
+        new_G_min = max(G.min_card, len(G.lower_bound))
+        if new_G_min != G.max_card:
+            G.min_card = new_G_min
+            changed = True
 
         return changed
 
@@ -59,17 +66,25 @@ class SetSolver:
     ) -> bool:
         changed = False
 
-        # Update bounds
-        new_H_lower = F.lower_bound.intersection(G.lower_bound)
-        if new_H_lower != H.lower_bound:
-            H.lower_bound = new_H_lower
+        new_G_lower = G.lower_bound.intersection(H.lower_bound)
+        if new_G_lower != G.lower_bound:
+            G.lower_bound = new_G_lower
             changed = True
 
-        new_H_upper = F.upper_bound.intersection(G.upper_bound)
-        if new_H_upper != H.upper_bound:
-            H.upper_bound = new_H_upper
+        new_G_upper = G.upper_bound.intersection(H.upper_bound)
+        if new_G_upper != G.upper_bound:
+            G.upper_bound = new_G_upper
             changed = True
 
+        new_G_max = min(G.max_card, len(G.upper_bound))
+        if new_G_max != G.max_card:
+            G.max_card = new_G_max
+            changed = True
+
+        new_G_min = max(G.min_card, len(G.lower_bound))
+        if new_G_min != G.max_card:
+            G.min_card = new_G_min
+            changed = True
 
 
         return changed
@@ -190,7 +205,7 @@ class SetSolver:
 
         return changed
 
-    def propagate(self) -> bool:
+    def filter(self) -> bool:
         changed = True
         while changed:
             changed = False
@@ -254,8 +269,8 @@ def subset_example():
 
     solver.add_constraint("subset", "X", "Y")
 
-    solver.propagate()
+    solver.filter()
 
-    print("\nAfter propagation:")
+    print("\nAfter filtering:")
     print(f"X must contain: {X.lower_bound}, can contain: {X.upper_bound}")
     print(f"Y must contain: {Y.lower_bound}, can contain: {Y.upper_bound}")
