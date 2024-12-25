@@ -1,12 +1,10 @@
 % The Social Golfer Problem
-
 % Parameters
+int: W; % The number of weeks
 int: G; % The number of groups
 int: P; % The number of golfers per group
-int: W; % The number of weeks
 
-int: Q = G * P; 
-int: T = W * G; 
+int: Q = G * P;
 set of int: Golfers = 0..Q-1;
 set of int: Weeks = 0..W-1;
 set of int: Groups = 0..G-1;
@@ -18,12 +16,11 @@ constraint forall(w in Weeks, g in Groups) (
 
 constraint forall(w in Weeks) (
     card(array_union([S[w,g] | g in Groups])) = Q
+
 );
 
-constraint forall(w1, w2 in Weeks where w1 <= w2) (
-    forall(g1 in Groups, g2 in Groups where w1 == w2 -> g1 < g2) (
-        card(S[w1,g1] intersect S[w2,g2]) <= 1
-    )
+constraint forall(q1, q2 in Golfers where q1 < q2) (
+    sum(w in Weeks, g in Groups)(min(P, card(S[w, g] symdiff {q1, q2}))) >= G * P * W -2
 );
 
 solve satisfy;

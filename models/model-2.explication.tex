@@ -1,0 +1,52 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb}
+\usepackage{enumitem}
+
+\begin{document}
+
+\section*{Mod\'elisation ensembliste : model-2}
+
+Ici la seule différence avec le model-1 réside dans la 3éme contrainte, ici on va utiliser les opérateurs ensemblistes, et plus précisément le cardinal (|...|) d'une intersection (∩) entre des ensembles mais aussi plus d'opérations arithmétiques (produits et sommes) que ce qu'on a dans la version précédente.
+
+\subsection*{Contrainte 3 : Deux golfeurs ne se rencontrent pas plus d'une fois}
+
+\subsubsection*{Formulation mathématique}
+\[
+\forall q_1,q_2 \in \text{Golfers}, q_1 < q_2 : \sum_{w \in \text{Weeks}} \sum_{g \in \text{Groups}} (|S_{w,g} \cap \{q_1,q_2\}| \times |S_{w,g} \cap \{q_1\}| \times |S_{w,g} \cap \{q_2\}|) \leq 2
+\]
+
+\subsubsection*{Explication détaillée}
+Pour comprendre cette contrainte, analysons chaque terme :
+
+\begin{itemize}
+   \item $|S_{w,g} \cap \{q_1,q_2\}|$ vaut :
+   \begin{itemize}
+       \item 2 si $q_1$ et $q_2$ sont dans $S_{w,g}$
+       \item 1 si un seul est dans $S_{w,g}$
+       \item 0 si aucun n'est dans $S_{w,g}$
+   \end{itemize}
+   
+   \item $|S_{w,g} \cap \{q_1\}|$ vaut :
+   \begin{itemize}
+       \item 1 si $q_1$ est dans $S_{w,g}$
+       \item 0 sinon
+   \end{itemize}
+   
+   \item $|S_{w,g} \cap \{q_2\}|$ vaut :
+   \begin{itemize}
+       \item 1 si $q_2$ est dans $S_{w,g}$
+       \item 0 sinon
+   \end{itemize}
+\end{itemize}
+
+Le produit de ces trois termes vaut donc :
+\begin{itemize}
+   \item 2 si $q_1$ et $q_2$ sont dans le même groupe
+   \item 0 sinon
+\end{itemize}
+
+\subsubsection*{Note sur la condition $q_1 < q_2$}
+La condition $q_1 < q_2$ est utilisée pour éviter la redondance dans la vérification des paires de golfeurs. Puisque la contrainte est symétrique, vérifier la paire $(q_1,q_2)$ ou $(q_2,q_1)$ produirait le même résultat. Cette condition permet donc d'optimiser le nombre de vérifications nécessaires.
+
+
+\end{document}
