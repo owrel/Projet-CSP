@@ -1,0 +1,56 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb}
+\usepackage{enumitem}
+
+\begin{document}
+
+\section*{Mod\'elisation ensembliste}
+
+\subsection*{C'est quoi une mod\'elisation ensembliste ?}
+
+On mod\'elise le probl\`eme en utilisant des ensembles et des op\'erations sur les ensembles.
+
+\begin{itemize}[label=\textbullet]
+    \item Les variables repr\'esentent des ensembles.
+    \item Les domaines sont aussi des ensembles, souvent d\'etermin\'es comme des \emph{parties} (sous-ensembles) des variables ou des \emph{parties des parties} (sous-ensembles s\'electionn\'es).
+    \item Exemple : Soit $U = \{1, 2\}$ l'ensemble des variables. Les parties de $U$ ($P(U)$) sont \[ P(U) = \{ \emptyset, \{1\}, \{2\}, \{1, 2\}\}. \] Dans certains cas, on restreint le domaine \`a un sous-ensemble de $P(U)$ en fonction des contraintes.
+    \item Les contraintes sont exprim\'ees avec des op\'erations ensemblistes telles que :
+    \begin{itemize}[label=\textendash]
+        \item L'intersection ($\cap$),
+        \item L'union ($\cup$),
+        \item Le cardinal d'un ensemble ($|E|$),
+        \item L'inclusion ($\subseteq$).
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Variables $X$}
+
+\begin{itemize}[label=\textbullet]
+    \item Soit $G_{ij}$ l'ensemble des golfeurs qui jouent dans le groupe $j$ pendant la semaine $i$.
+    \item $X = \{G_{ij} \mid i \in [1..w], j \in [1..g]\}$.
+\end{itemize}
+
+\subsection*{Domaines $D$}
+
+\begin{itemize}[label=\textbullet]
+    \item $D = \{X \in P(\{0, \ldots, q-1\}) \mid |X| = p\}$, \newline
+          o\`u $P$ repr\'esente l'ensemble des parties (tous les sous-ensembles possibles de golfeurs).
+\end{itemize}
+
+\subsection*{Contraintes $C = C_1 \cup C_2 \cup C_3$}
+
+\begin{itemize}[label=\textbullet]
+    \item \textbf{$C_1$ : Chaque groupe a exactement $p$ golfeurs.}
+          \[ \forall i \in [1..w], \forall j \in [1..g] : |G_{ij}| = p \]
+    \item \textbf{$C_2$ : Deux golfeurs ne peuvent pas se retrouver plus d'une fois dans le m\^eme groupe.}
+          \[ \forall k_1, k_2 \in [1..q], k_1 \neq k_2 : |\{(i, j) \mid \{k_1, k_2\} \subseteq G_{ij}\}| \leq 1 \]
+          \begin{itemize}[label=\textendash]
+              \item $\{k_1, k_2\} \subseteq G_{ij}$ : On v\'erifie si les golfeurs $k_1$ et $k_2$ sont tous les deux dans le groupe $j$ de la semaine $i$.
+              \item $\{(i, j) \mid \dots\}$ : On collecte tous les couples (semaine, groupe) o\`u $k_1$ et $k_2$ sont ensemble.
+              \item $|\dots| \leq 1$ : Le nombre de ces couples ne doit pas d\'epasser $1$.
+          \end{itemize}
+    \item \textbf{$C_3$ : Chaque golfeur est dans exactement un groupe.}
+          \[ \forall i \in [1..w], \forall k \in [1..q] : |\{j \mid k \in G_{ij}\}| = 1 \]
+\end{itemize}
+
+\end{document}
