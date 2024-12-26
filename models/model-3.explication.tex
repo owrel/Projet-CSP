@@ -1,0 +1,111 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\title{Comparaison des Modélisations du Social Golfer Problem}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+Le Social Golfer Problem peut être modélisé de différentes manières. Nous allons présenter une modélisation utilisant des contraintes globales.
+
+\section{Modélisation avec Contraintes Globales}
+
+\subsection{Variables}
+\[
+schedule = \{schedule_{w,g,p} \mid w \in [1..W], g \in [1..G], p \in [1..P]\}
+\]
+où $schedule_{w,g,p}$ représente l'identifiant du $p^{ème}$ golfeur dans le groupe $g$ de la semaine $w$
+
+\subsection{Domaines}
+\[
+D = [0..Q-1]
+\]
+\[
+\forall w \in [1..W], g \in [1..G], p \in [1..P] : schedule_{w,g,p} \in D
+\]
+
+\subsection{Contraintes}
+\subsubsection{C1 : chaque golfeur est dans exactement un groupe }
+\[
+\forall w \in [1..W] : alldifferent(\{schedule_{w,g,p} \mid g \in [1..G], p \in [1..P]\})
+\]
+
+\subsubsection{C2 : Deux golfeurs ne se rencontrent pas plus d'une fois}
+\[
+\begin{aligned}
+&\forall w_1,w_2 \in [1..W], g_1,g_2 \in [1..G], \text{ où } w_1 < w_2 \vee (w_1 = w_2 \wedge g_1 < g_2) : \\
+&\quad \forall p_1,p_2 \in [1..P] : count(\{schedule_{w_1,g_1,p_1} = schedule_{w_2,g_2,p_2}\}) \leq 1
+\end{aligned}
+\]
+
+\subsubsection{C3 : Ordre des golfeurs dans chaque groupe (symétrie)}
+\[
+\forall w \in [1..W], g \in [1..G], p \in [1..P-1] : schedule_{w,g,p} < schedule_{w,g,p+1}
+\]
+
+\section{Comparaison des Modèles}
+
+\subsection{Différences Principales}
+\begin{itemize}
+   \item \textbf{Type de variables} :
+       \begin{itemize}
+           \item Modèle ensembliste : utilise des ensembles
+           \item Modèle avec contraintes globales : utilise des entiers
+       \end{itemize}
+   \item \textbf{Expression des contraintes} :
+       \begin{itemize}
+           \item Modèle ensembliste : opérations ensemblistes (union, intersection)
+           \item Modèle avec contraintes globales : contraintes prédéfinies (alldifferent, count)
+       \end{itemize}
+   \item \textbf{Structure} :
+       \begin{itemize}
+           \item Modèle ensembliste : plus naturel, plus proche de la description du problème
+           \item Modèle avec contraintes globales : potentiellement plus efficace pour la résolution
+       \end{itemize}
+\end{itemize}
+
+\subsection{Contrainte sur la taille des groupes}
+Dans le modèle ensembliste, nous devons explicitement spécifier :
+\[
+\forall w \in \text{Weeks}, \forall g \in \text{Groups} : |S[w,g]| = P
+\]
+Car $S[w,g]$ est un ensemble dont la taille pourrait varier si non contrainte.
+
+\subsection{Modèle à contraintes globales}
+Dans ce modèle, la contrainte de taille est implicite car :
+
+\begin{itemize}
+   \item La structure \texttt{schedule[w,g,p]} définit exactement P positions pour chaque groupe :
+   \[
+   schedule_{w,g,p} \text{ où } p \in [1..P]
+   \]
+   
+   \item La contrainte \texttt{allDifferent} assure que ces P positions sont occupées par des golfeurs différents :
+   \[
+   \forall w \in [1..W] : allDifferent(\{schedule_{w,g,p} \mid g \in [1..G], p \in [1..P]\})
+   \]
+\end{itemize}
+
+\subsection{Implications}
+Cette différence illustre un aspect important de la modélisation :
+\begin{itemize}
+   \item Le modèle ensembliste nécessite des contraintes explicites sur la cardinalité des ensembles
+   \item Le modèle à contraintes globales encode certaines contraintes dans la structure même des variables
+\end{itemize}
+
+Cette caractéristique du modèle à contraintes globales peut être vue comme un avantage car elle :
+\begin{itemize}
+   \item Réduit le nombre de contraintes explicites nécessaires
+   \item Peut améliorer l'efficacité de la résolution
+   \item Diminue les risques d'erreur de modélisation
+\end{itemize}
+
+\section{Conclusion}
+Bien que les deux modélisations représentent le même problème, elles diffèrent significativement dans leur approche. Le modèle ensembliste offre une représentation plus naturelle et plus proche de la description du problème, tandis que le modèle avec contraintes globales peut être plus efficace en termes de résolution grâce à l'utilisation de contraintes optimisées.
+
+\end{document}
