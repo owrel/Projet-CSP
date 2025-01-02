@@ -6,7 +6,7 @@
 
 \section*{Mod\'elisation ensembliste : model-2}
 
-Ici la seule différence avec le model-1 réside dans la 3éme contrainte, ici on va utiliser les opérateurs ensemblistes, et plus précisément le cardinal (|...|) d'une intersection (∩) entre des ensembles mais aussi plus d'opérations arithmétiques (produits et sommes) que ce qu'on a dans la version précédente.
+Ici la seule différence avec le model-1 réside dans la 2éme et 3éme contrainte, ici on va utiliser les opérateurs ensemblistes, et plus précisément le cardinal (|...|) d'une intersection (∩) entre des ensembles mais aussi plus d'opérations arithmétiques (produits et sommes) que ce qu'on a dans la version précédente.
 
 \subsection*{Contrainte 3 : Deux golfeurs ne se rencontrent pas plus d'une fois}
 
@@ -48,5 +48,13 @@ Le produit de ces trois termes vaut donc :
 \subsubsection*{Note sur la condition $q_1 < q_2$}
 La condition $q_1 < q_2$ est utilisée pour éviter la redondance dans la vérification des paires de golfeurs. Puisque la contrainte est symétrique, vérifier la paire $(q_1,q_2)$ ou $(q_2,q_1)$ produirait le même résultat. Cette condition permet donc d'optimiser le nombre de vérifications nécessaires.
 
-
+\subsection*{Contrainte 2 : L'union des groupes de chaque semaine contient tous les golfeurs}
+   \[ \forall w \in [1..W] : |\bigcup_{g \in Groups} S_{wg}| = Q \]
+   \begin{itemize}[label=\textendash]
+       \item $\bigcup_{g \in Groups} S_{wg}$ : Union de tous les groupes de la semaine $w$
+       \item $|\dots| = Q$ : Le cardinal de cette union doit être exactement $Q$ (nombre total de golfeurs)
+       \item Cette contrainte vérifie que chaque semaine, tous les golfeurs participent
+       \item Note: Elle n'empêche pas qu'un golfeur soit dans plusieurs groupes la même semaine
+   \end{itemize}
+   
 \end{document}
