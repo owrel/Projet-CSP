@@ -2,7 +2,7 @@
 include "globals.mzn";
 
 % Parameters
-int: W = 3;  % The number of weeks
+int: W;  % The number of weeks
 int: G;  % The number of groups
 int: P;  % The number of golfers per group
 int: Q = G * P;  % The number of golfers

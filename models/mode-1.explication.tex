@@ -37,20 +37,21 @@ On mod\'elise le probl\`eme en utilisant des ensembles et des op\'erations sur l
           o\`u $P$ repr\'esente l'ensemble des parties (tous les sous-ensembles possibles de golfeurs).
 \end{itemize}
 
-\subsection*{Contraintes $C = C_1 \cup C_2 \cup C_3$}
-
+\subsection*{Contraintes $C = C_1, C_2, C_3$}
 \begin{itemize}[label=\textbullet]
-    \item \textbf{$C_1$ : Chaque groupe a exactement $p$ golfeurs.}
-          \[ \forall i \in [1..w], \forall j \in [1..g] : |G_{ij}| = p \]
-    \item \textbf{$C_2$ : Deux golfeurs ne peuvent pas se retrouver plus d'une fois dans le m\^eme groupe.}
-          \[ \forall k_1, k_2 \in [1..q], k_1 \neq k_2 : |\{(i, j) \mid \{k_1, k_2\} \subseteq G_{ij}\}| \leq 1 \]
-          \begin{itemize}[label=\textendash]
-              \item $\{k_1, k_2\} \subseteq G_{ij}$ : On v\'erifie si les golfeurs $k_1$ et $k_2$ sont tous les deux dans le groupe $j$ de la semaine $i$.
-              \item $\{(i, j) \mid \dots\}$ : On collecte tous les couples (semaine, groupe) o\`u $k_1$ et $k_2$ sont ensemble.
-              \item $|\dots| \leq 1$ : Le nombre de ces couples ne doit pas d\'epasser $1$.
-          \end{itemize}
-    \item \textbf{$C_3$ : Chaque golfeur est dans exactement un groupe.}
-          \[ \forall i \in [1..w], \forall k \in [1..q] : |\{j \mid k \in G_{ij}\}| = 1 \]
+   \item \textbf{$C_1$ : Chaque groupe a exactement $p$ golfeurs}
+         \[ \forall i \in [1..w], \forall j \in [1..g] : |G_{ij}| = p \]
+   
+   \item \textbf{$C_2$ : Chaque golfeur est dans exactement un groupe par semaine}
+         \[ \forall i \in [1..w], \forall k \in [1..q] : |\{j \mid k \in G_{ij}\}| = 1 \]
+   
+   \item \textbf{$C_3$ : Deux golfeurs ne peuvent pas se retrouver plus d'une fois ensemble pendant le tournoi}
+         \[ \forall w_1, w_2 \in [1..w], w_1 \leq w_2, \forall g_1, g_2 \in [1..g], (w_1 = w_2 \rightarrow g_1 < g_2) : |G_{w_1g_1} \cap G_{w_2g_2}| \leq 1 \]
+         \begin{itemize}[label=\textendash]
+             \item $w_1 \leq w_2$ : Évite la redondance en ne comparant que les semaines dans un sens
+             \item $(w_1 = w_2 \rightarrow g_1 < g_2)$ : Pour une même semaine, compare uniquement les groupes dans un ordre croissant
+             \item $|G_{w_1g_1} \cap G_{w_2g_2}| \leq 1$ : L'intersection entre deux groupes ne doit pas dépasser un golfeur
+         \end{itemize}
 \end{itemize}
 
 \end{document}

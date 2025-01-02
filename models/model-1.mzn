@@ -1,5 +1,3 @@
-% The Social Golfer Problem
-
 % Parameters
 int: G; % The number of groups
 int: P; % The number of golfers per group
@@ -16,8 +14,8 @@ constraint forall(w in Weeks, g in Groups) (
     card(S[w,g]) = P
 );
 
-constraint forall(w in Weeks) (
-    card(array_union([S[w,g] | g in Groups])) = Q
+constraint forall(w in Weeks, k in Golfers) (
+    card({g | g in Groups where k in S[w,g]}) = 1
 );
 
 constraint forall(w1, w2 in Weeks where w1 <= w2) (
