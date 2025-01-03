@@ -1,0 +1,132 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{array}
+\usepackage{booktabs}
+
+\title{Solution du Social Golfer Problem}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Caractéristiques pour la comparaison des modèles}
+
+\subsection{Critères d'évaluation}
+\begin{itemize}
+    \item Temps moyen sur plusieurs exécutions
+    \item Taux de réussite (pour les grandes instances) : Pourcentage d'instances résolues dans le temps fixé au départ, reflétant l'efficacité du modèle à gérer des cas complexes dans une durée limitée.
+    \item Consommation de ressources (pour les grandes instances) : Quantité de mémoire et de puissance de calcul utilisées par le modèle, permettant d'évaluer sa faisabilité pratique pour des instances de grande taille.
+\end{itemize}
+
+\end{itemize}
+
+\section{Comparaison entre modèlee}
+\subsection{Instance 1 (Petite instance)}
+\item \textbf{Pramétres :}
+\begin{itemize}
+  \item Nombre de groupes (G) : 3
+  \item Nombre de golfeurs par groupe (P) : 2
+  \item Nombre de semaines (W) : 4
+  \item Nombre total de golfeurs (Q = G × P) : 6 (numérotés de 0 à 5)
+\end{itemize}
+
+\item \textbf{Solutions :}
+\begin{table}[h]
+\centering
+\begin{tabular}{c|ccc}
+\toprule
+Semaine & Groupe 1 & Groupe 2 & Groupe 3 \\
+\midrule
+1 & \{2,5\} & \{1,3\} & \{0,4\} \\
+2 & \{2,4\} & \{1,5\} & \{0,3\} \\
+3 & \{3,5\} & \{1,4\} & \{0,2\} \\
+4 & \{4,5\} & \{2,3\} & \{0,1\} \\
+\bottomrule
+\end{tabular}
+\caption{Répartition des golfeurs par groupe et par semaine - modèle 1 (ensembliste)}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c|ccc}
+\toprule
+Semaine & Groupe 1 & Groupe 2 & Groupe 3 \\
+\midrule
+1 & \{1,4\} & \{0,2\} & \{3,5\} \\
+2 & \{2,4\} & \{1,5\} & \{0,3\} \\
+3 & \{3,4\} & \{1,2\} & \{0,5\} \\
+4 & \{4,5\} & \{2,3\} & \{0,1\} \\
+\bottomrule
+\end{tabular}
+\caption{Répartition des golfeurs par groupe et par semaine - modèle 2 (contraintes globale)}
+\end{table}
+
+\item \textbf{Temps moyen sur 5 éxécutions : }
+
+99, 6 msec (modèle 1)
+
+140, 8 msec (modèle 2)
+
+Pour cette instance on a utiliser les models simple sans le cassage de symétrie.
+
+\subsection{Instance 2 (Grande instance - 1)}
+\item \textbf{Pramétres :}
+\begin{itemize}
+  \item Nombre de groupes (G) : 5
+  \item Nombre de golfeurs par groupe (P) : 3
+  \item Nombre de semaines (W) : 7
+  \item Nombre total de golfeurs (Q = G × P) : 15 (numérotés de 0 à 14)
+\end{itemize}
+    
+\item \textbf{Model - 1} :
+\begin{itemize}
+    \item Sans cassage de symétrie : Notre modèle sans cassage de symétrie a tourné pendant plus d'une heure avant que nous ne décidions d'arrêter l'exécution, car le temps de calcul devenait excessif sans aboutir à des résultats exploitables. 
+    \item Cassage de symétrie qu'avec la contrainte $C_5$ "Ordonnancement des groupes par minimum" :
+    \begin{table}[h]
+\centering
+\begin{tabular}{c|ccccc}
+\toprule
+Semaine & Groupe 0 & Groupe 1 & Groupe 2 & Groupe 3 & Groupe 4 \\
+\midrule
+0 & \{0,4,8\} & \{1,3,10\} & \{2,5,7\} & \{6,11,14\} & \{9,12,13\} \\
+1 & \{0,3,9\} & \{1,4,14\} & \{2,8,11\} & \{5,10,13\} & \{6,7,12\} \\
+2 & \{0,7,11\} & \{1,6,9\} & \{2,4,13\} & \{3,5,14\} & \{8,10,12\} \\
+3 & \{0,5,12\} & \{1,7,13\} & \{2,3,6\} & \{4,10,11\} & \{8,9,14\} \\
+4 & \{0,1,2\} & \{3,4,12\} & \{5,9,11\} & \{6,8,13\} & \{7,10,14\} \\
+5 & \{0,6,10\} & \{1,5,8\} & \{2,12,14\} & \{3,11,13\} & \{4,7,9\} \\
+6 & \{0,13,14\} & \{1,11,12\} & \{2,9,10\} & \{3,7,8\} & \{4,5,6\} \\
+\bottomrule
+\end{tabular}
+\caption{Répartition des golfeurs par groupe et par semaine - modèle 1}
+\end{table}
+
+\end{itemize}
+\item \textbf{Temps moyen sur 5 éxécutions} :\textbf{ } 1m9s
+\paragraph{Analyse de la contrainte $C_5$} : Cette contrainte d'ordonnancement par minimum des groupes agit comme une puissante contrainte de symétrie, réduisant l'espace de recherche d'un facteur $(G!)^W$ en éliminant les permutations équivalentes des groupes au sein de chaque semaine.
+L'efficacité remarquable de cette approche est démontrée par une réduction du temps d'exécution d'une heure à 69 secondes, illustrant l'importance cruciale des contraintes de symétrie dans la résolution de problèmes combinatoires.
+Le choix d'utiliser le minimum comme critère d'ordonnancement est particulièrement pertinent car il combine simplicité de calcul et unicité de la valeur par groupe, tout en assurant une propagation efficace dans l'arbre de recherche.
+\begin{itemize}
+    \item Cassage de symétrie en utilisant les 3 contraintes  $C_4$, $C_5$ et $C_6$  : 
+\begin{table}[h]
+\centering
+\begin{tabular}{c|ccccc}
+\toprule
+Semaine & Groupe 1 & Groupe 2 & Groupe 3 & Groupe 4 & Groupe 5 \\
+\midrule
+0 & \{0,1,2\} & \{3,4,5\} & \{6,7,8\} & \{9,10,11\} & \{12,13,14\} \\
+1 & \{0,3,6\} & \{1,10,14\} & \{2,4,11\} & \{5,7,13\} & \{8,9,12\} \\
+2 & \{0,4,8\} & \{1,7,11\} & \{2,3,13\} & \{5,9,14\} & \{6,10,12\} \\
+3 & \{0,5,10\} & \{1,4,12\} & \{2,7,9\} & \{3,8,14\} & \{6,11,13\} \\
+4 & \{0,7,12\} & \{1,3,9\} & \{2,6,14\} & \{4,10,13\} & \{5,8,11\} \\
+5 & \{0,9,13\} & \{1,5,6\} & \{2,8,10\} & \{3,11,12\} & \{4,7,14\} \\
+6 & \{0,11,14\} & \{1,8,13\} & \{2,5,12\} & \{3,7,10\} & \{4,6,9\} \\
+\bottomrule
+\end{tabular}
+\caption{Répartition des golfeurs par groupe et par semaine - model 1}
+\end{table}
+
+\end{itemize}
+    \item \textbf{Temps moyen sur 5 éxécutions} :\textbf{ } 51s345ms
+
+\end{document}

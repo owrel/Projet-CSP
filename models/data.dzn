@@ -1,0 +1,7 @@
+%%% File to fixe the Model parameters 
+%%% Command to execute the model, example for model-1.mzn : time minizinc --solver COIN-BC  models/model-1.mzn
+%%% the used solver in this execution : `COIN-BC`
+
+G = 5; % The number of groups
+P = 3; % The number of golfers per group
+W = 7; % The number of weeks
