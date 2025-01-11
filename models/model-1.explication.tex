@@ -54,4 +54,138 @@ On mod\'elise le probl\`eme en utilisant des ensembles et des op\'erations sur l
          \end{itemize}
 \end{itemize}
 
+\subsection*{Contraintes de cassage de symétrie $C_4$, $C_5$, $C_6$}
+\begin{itemize}[label=\textbullet]
+\item \textbf{$C_4$ : Initialisation de la première semaine}
+\[ \forall g \in [0..G-1], \forall i \in [0..P-1] : G_{0g} = G_{0g} \cup \{g*P + i\} \]
+\begin{itemize}[label=\textendash]
+\item Cette contrainte fixe l'affectation des golfeurs pour la première semaine
+\item Exemple avec $G=2$ groupes et $P=2$ joueurs par groupe :
+  \begin{itemize}
+    \item Groupe 0 : $\{0, 1\}$ (car $0*2 + 0 = 0$ et $0*2 + 1 = 1$)
+    \item Groupe 1 : $\{2, 3\}$ (car $1*2 + 0 = 2$ et $1*2 + 1 = 3$)
+  \end{itemize}
+\end{itemize}
+\paragraph{Analyse formelle de la réduction de l'espace de recherche par $C_4$}
+
+Sans la contrainte $C_4$, pour la première semaine, le nombre de façons de répartir $Q$ golfeurs en $G$ groupes de taille $P$ est donné par :
+
+\[ \frac{Q!}{(P!)^G} \]
+
+\textbf{\textit{Exemple simple de réduction par $C_4$ :}}
+
+Soit $Q=4$ golfeurs $\{0,1,2,3\}$, $G=2$ groupes, et $P=2$ golfeurs par groupe.
+
+\subsubsection*{Sans considérer l'équivalence des permutations dans les groupes}
+$Q! = 4! = 24$ permutations génèrent ces arrangements :
+\begin{itemize}[label=\textendash]
+\item $\{\{0,1\},\{2,3\}\}$ apparaît sous 4 formes :
+  \begin{itemize}
+    \item $\{\{0,1\},\{2,3\}\}$
+    \item $\{\{1,0\},\{2,3\}\}$
+    \item $\{\{0,1\},\{3,2\}\}$
+    \item $\{\{1,0\},\{3,2\}\}$
+  \end{itemize}
+\end{itemize}
+
+\subsubsection*{Analyse des permutations redondantes}
+Pour chaque groupe :
+\begin{itemize}[label=\textendash]
+\item $P! = 2!$ permutations internes ($\{0,1\}$ équivalent à $\{1,0\}$)
+\item $G = 2$ groupes
+\item Donc $(P!)^G = (2!)^2 = 4$ permutations représentent la même solution
+\end{itemize}
+
+\subsubsection*{Nombre réel de solutions distinctes}
+\[ \frac{Q!}{(P!)^G} = \frac{24}{4} = 6 \text{ solutions uniques} \]
+
+Cette division par $(P!)^G$ élimine le comptage multiple des solutions équivalentes dû aux permutations internes des groupes.
+
+Avec la contrainte $C_4$ qui fixe :
+\[ \forall g \in [0..G-1], \forall i \in [0..P-1] : G_{0g} = G_{0g} \cup \{g*P + i\} \]
+
+Le nombre de possibilités pour la première semaine devient 1, car la répartition est entièrement déterminée. Cela réduit l'espace de recherche d'un facteur de $\frac{Q!}{(P!)^G}$.
+
+Par exemple, avec $G=2$ groupes et $P=2$ joueurs par groupe ($Q=4$ golfeurs) :
+\begin{itemize}[label=\textendash]
+\item Sans $C_4$ : $\frac{4!}{(2!)^2} = \frac{24}{4} = 6$ configurations possibles
+\item Avec $C_4$ : Une seule configuration possible, $\{\{0,1\}, \{2,3\}\}$
+\end{itemize}
+
+Cette réduction de l'espace de recherche est significative car toutes ces configurations de la première semaine sont symétriques et mènent à des solutions équivalentes.
+
+\item \textbf{$C_5$ : Ordonnancement des groupes par minimum}
+\[ \forall w \in [0..W-1], \forall g_1, g_2 \in [0..G-1], g_1 < g_2 : \min(G_{wg_1}) < \min(G_{wg_2}) \]
+\begin{itemize}[label=\textendash]
+\item Force un ordre croissant des minimums entre les groupes d'une même semaine
+\item Exemple : avec $Q=9$, $G=3$, $P=3$ pour une semaine donnée :
+  Sans $C_5$, ces configurations sont considérées comme équivalentes :
+  \begin{itemize}
+    \item $\{\{2,4,7\}, \{0,5,8\}, \{1,3,6\}\}$
+    \item $\{\{0,5,8\}, \{1,3,6\}, \{2,4,7\}\}$
+    \item $\{\{0,5,8\}, \{2,4,7\}, \{1,3,6\}\}$
+    \item $\{\{1,3,6\}, \{0,5,8\}, \{2,4,7\}\}$
+    \item $\{\{1,3,6\}, \{2,4,7\}, \{0,5,8\}\}$
+    \item $\{\{2,4,7\}, \{1,3,6\}, \{0,5,8\}\}$
+  \end{itemize}
+  
+  Avec $C_5$, seule cette configuration est valide :
+  \[ \{\{0,5,8\}, \{1,3,6\}, \{2,4,7\}\} \]
+  Car :
+  \begin{itemize}
+    \item $\min(\{0,5,8\}) = 0$ pour groupe 0
+    \item $\min(\{1,3,6\}) = 1$ pour groupe 1
+    \item $\min(\{2,4,7\}) = 2$ pour groupe 2
+    \item Et $0 < 1 < 2$ respecte l'ordre croissant des minimums
+  \end{itemize}
+  
+\item Impact sur l'espace de recherche :
+  \begin{itemize}
+    \item Sans $C_5$: Pour une semaine, les 3 groupes peuvent être permutés de 6 façons ($3!$)
+    \item Avec $C_5$: Une seule configuration possible pour l'ordre des groupes
+    \item Pour chaque semaine $w$, sans la contrainte $C_5$, les $G$ groupes peuvent être permutés de $G!$ façons différentes.
+    
+    \[ \text{Facteur de réduction} = G! \]
+    
+    \begin{itemize}[label=\textendash]
+    \item Pour $G=2$ groupes : réduction par $2! = 2$
+    \item Pour $G=3$ groupes : réduction par $3! = 6$
+    \item Pour $G=4$ groupes : réduction par $4! = 24$
+    \item Pour $G=5$ groupes : réduction par $5! = 120$
+    \end{itemize}
+    
+Cette réduction s'applique à chaque semaine $w \in [0..W-1]$, donc l'impact total sur l'espace de recherche est de :
+\[ \text{Réduction totale} = (G!)^W \]
+où $W$ est le nombre de semaines.
+\end{itemize}
+\end{itemize}
+
+\item \textbf{$C_6$ : Ordre croissant des maximums dans le premier groupe}
+\[ \forall w_1, w_2 \in [0..W-1], w_1 < w_2 : \max(G_{w_10}) \leq \max(G_{w_20}) \]
+\begin{itemize}[label=\textendash]
+\item Impose que le maximum du premier groupe ($g=0$) soit croissant d'une semaine à l'autre
+\item Exemple avec $Q=4$, $G=2$, $P=2$ sur deux semaines :
+  Sans $C_6$, ces deux configurations sont équivalentes :
+  \begin{itemize}
+    \item Semaine 1, Groupe 0 : $\{1,3\}$ ($\max = 3$)
+    \item Semaine 2, Groupe 0 : $\{0,2\}$ ($\max = 2$)
+  \end{itemize}
+  Avec $C_6$, cette configuration est invalide car $3 \not\leq 2$. \\
+  Une configuration valide serait :
+  \begin{itemize}
+    \item Semaine 1, Groupe 0 : $\{0,2\}$ ($\max = 2$)
+    \item Semaine 2, Groupe 0 : $\{1,3\}$ ($\max = 3$)
+  \end{itemize}
+  Cette contrainte réduit encore l'espace de recherche en ordonnant les semaines.
+\end{itemize}
+
+\paragraph{Pourquoi ces contraintes de cassage de symétrie ?}
+
+Ces contraintes réduisent l'espace de recherche en éliminant les solutions symétriques :
+\begin{itemize}[label=\textbullet]
+\item $C_4$ fixe une solution initiale pour la première semaine, évitant les permutations de la configuration initiale
+\item $C_5$ évite les permutations entre les groupes d'une même semaine
+\item $C_6$ réduit les permutations possibles entre les semaines en imposant un ordre sur le premier groupe
+\end{itemize}
+
 \end{document}
