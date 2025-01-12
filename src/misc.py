@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import cache
 import time
 import tracemalloc
 

@@ -1,4 +1,3 @@
-from posixpath import defpath
 import time
 import signal
 import sys
