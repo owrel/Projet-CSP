@@ -1,15 +1,15 @@
-#const weeks = 2.
+#const weeks = 3.
 #const groups = 3.
-#const size = 3.
+#const players_per_group = 2.
 
 
-golfer(1..G) :- G = groups * size.
+golfer(1..G) :- G = groups * players_per_group.
 week(1..weeks).
 group(1..groups).
 
 1 { assign(P, G, W) : group(G) } 1 :- golfer(P), week(W).
 
-:- week(W), group(G), not #count{P : assign(P,G,W)} = size.
+:- week(W), group(G), not #count{P : assign(P,G,W)} = players_per_group.
 
 :- golfer(X), week(W), #count{G : assign(X,G,W)} > 1.
 
@@ -20,10 +20,3 @@ group(1..groups).
    W1 < W2.
 
 #show assign/3.
-
-
-% pip install clingo
-% Enumérer une solution
-% python -m clingo 1 asp/sgp.lp
-% Obtenir le nombre de solution
-% python -m clingo 0 asp/sgp.lp --quiet

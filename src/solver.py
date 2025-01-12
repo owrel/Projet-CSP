@@ -1,298 +1,322 @@
-from typing import Optional, Dict, List
-from .variables import SetVariable
-from .logger import Logger
-from .constraints import Constraint
-from .metrics import SharedMetrics
+from posixpath import defpath
 import time
-import math
+import signal
+import sys
+import random
+from enum import Enum
+
+from src.constraints import Constraint
+from src.misc import Operation, OperationType, SolverMetrics, StateComputer
+from src.variables import SetVariable
+from .visualization import SetTreeVisualizer, ConstraintGraphVisualizer
+
+
+class Restarting(Exception): ...
+
+
+class VariableStrategy(Enum):
+    FIRST = "first"
+    SMALLEST_DOMAIN = "smallest_domain"
+    LEAST_CONSTRAINED = "least_constrained"
+    MOST_CONSTRAINED = "most_constrained"
+    RANDOM = "random"
+
+
+class VariableValueStrategy(Enum):
+    SIMPLE = "simple"
+    RANDOM = "random"
+    LOWEST_FREQUENCY = "lowest_frequency"
+
+
+class RestartingStrategy(Enum):
+    RANDOM = "random"
+    NEXT = "next"
+    CONSTRAINED_RANDOM = "constrained_random"
 
 
 class SetSolver:
-    def __init__(self, log_level="INFO", shared_metrics=None):
-        self.logger = Logger(log_level)
-        self.variables: Dict[str, SetVariable] = {}
-        self.constraints: List[Constraint] = []
-        self.universe: set[int] = set()
-        self.solutions: List[Dict[str, SetVariable]] = []
-        self.metrics = shared_metrics if shared_metrics else SharedMetrics()
-        self.failed_states = set()
-        self.explored_states = {}
+    def __init__(self, options: dict | None = None) -> None:
+        default_options = {
+            "variable_strategy": VariableStrategy.SMALLEST_DOMAIN,
+            "visualize": False,
+        }
+        self.options: dict = {**default_options, **(options or {})}
+        self.variables: dict[str, SetVariable] = {}
+        self.constraints: list[Constraint] = []
+        self.metrics = SolverMetrics()
+        self.visualizer: SetTreeVisualizer | None = (
+            SetTreeVisualizer() if options and options["visualize"] else None
+        )
+        self.operation_history: list[Operation] = []
+        self.solution_path: list[Operation] = []
+        self.visited_states: set[tuple[Operation, ...]] = set()
+        self.state_computer: StateComputer
+        self.restarting = False
 
-    def create_set_variable(
-        self,
-        name: str,
-        lower: set[int],
-        upper: set[int],
-        min_card: int = 0,
-        max_card: Optional[int] = None,
-    ) -> SetVariable:
-        if max_card is None:
-            max_card = len(upper)
+        self.restarting_strategy: RestartingStrategy = RestartingStrategy.RANDOM
 
-        var = SetVariable(name, lower, upper, min_card, max_card)
-        if not var.is_consistent():
-            raise ValueError(f"Attempting to create inconsistent variable {name}")
-        self.variables[name] = var
-        self.universe.update(upper)
-        return var
+        signal.signal(signal.SIGINT, self.handle_interrupt)
 
-    def show_state(self) -> str:
-        state_str = []
+    def add_variable(self, variable: SetVariable) -> None:
+        self.variables[variable.name] = variable
+        for value in variable._upper_bound:
+            if variable.name not in self.metrics.var_value_frequency:
+                self.metrics.var_value_frequency[variable.name] = {}
+            self.metrics.var_value_frequency[variable.name][value] = 0
 
-        state_str.append("=== Variables ===")
-        for var in self.variables.values():
-            cons = "✓" if var.is_consistent() else "✗"
-            validity = "✓" if var.is_valid() else "✗"
-
-            state_str.append(
-                f"{var.name}:{var.lower_bound} -> {var.undetermined} [{var.min_card}, {var.max_card}] validity : {validity} cons : {cons}"
-            )
-
-        state_str.append("=== Constraints ===")
-        for constraint in self.constraints:
-            is_satisfied = constraint()
-            status = "✓" if is_satisfied else "✗"
-            state_str.append(f"{status} {constraint}")
-
-        return "\n".join(state_str)
-
-    def add_constraint(self, constraint: Constraint):
+    def add_constraint(self, constraint: Constraint) -> None:
         self.constraints.append(constraint)
 
-    def filter(self) -> bool:
-        start_time = time.time()
-        self.metrics.filtering_rounds += 1
+    def get_variable_constraints(self, var_name: str) -> int:
+        return sum(
+            1
+            for c in self.constraints
+            if var_name
+            in [
+                getattr(c, attr) for attr in dir(c) if isinstance(getattr(c, attr), str)
+            ]
+        )
 
-        queue = list(self.constraints)
+    def visualize_constraint_graph(self):
+        constraint_viz = ConstraintGraphVisualizer()
+        constraint_viz.build_graph(self.variables, self.constraints)
+        constraint_viz.save(f"constraint_graph_{time.strftime('%Y%m%d_%H%M%S')}")
 
-        while queue:
-            constraint_start = time.time()
-            constraint = queue.pop(0)
-            self.metrics.constraint_checks += 1
-            if constraint.filter():
-                constraint_end = time.time()
-                self.metrics.add_filtering_time(constraint_end - constraint_start)
-                affected_vars = constraint.get_variables()
-                for var in affected_vars:
-                    if not var.is_consistent():
-                        # self.logger.error(
-                        #     f"Inconsistency detected in variable {var.name}:"
-                        # )
-                        # self.logger.error(f"Current state: {var}")
-                        # self.logger.error(self._get_inconsistency_reason(var))
-                        return False
-
-                for other_constraint in self.constraints:
-                    if other_constraint == constraint:
-                        continue
-
-                    if any(
-                        v in other_constraint.get_variables() for v in affected_vars
-                    ):
-                        if other_constraint not in queue:
-                            queue.append(other_constraint)
-
-        for var in self.variables.values():
-            if var.upper_bound == set():  # Empty domain
-                print("empty")
-                return False
-            if not var.is_consistent():
-                # self.logger.error(f"Inconsistency detected in variable {var.name}:")
-                # self.logger.error(f"Current state: {var}")
-                # self.logger.error(self._get_inconsistency_reason(var))
-                return False
-
-        end_time = time.time()
-        self.metrics.add_filtering_time(end_time - start_time)
-        return True
-
-    def _get_inconsistency_reason(self, var: SetVariable) -> str:
-        reasons = []
-        if not var.lower_bound.issubset(var.upper_bound):
-            reasons.append(
-                f"Lower bound {var.lower_bound} is not subset of upper bound {var.upper_bound}"
-            )
-
-        if len(var.lower_bound) > var.max_card:
-            reasons.append(
-                f"Lower bound size {len(var.lower_bound)} exceeds max cardinality {var.max_card}"
-            )
-
-        if len(var.upper_bound) < var.min_card:
-            reasons.append(
-                f"Upper bound size {len(var.upper_bound)} is less than min cardinality {var.min_card}"
-            )
-
-        if var.min_card > var.max_card:
-            reasons.append(
-                f"Min cardinality {var.min_card} exceeds max cardinality {var.max_card}"
-            )
-
-        return "\n".join(reasons)
-
-    def _choose_variable(self) -> Optional[SetVariable]:
-
-        unsatisfied_vars = set()
-        for constraint in self.constraints:
-            if not constraint.evaluate():
-                unsatisfied_vars.update(constraint.get_variables())
-
-        invalid_vars = set(var for var in self.variables.values() if not var.is_valid())
-
-        undetermined_vars = [var for var in self.variables.values() if var.undetermined]
-        if not undetermined_vars:
+    def choose_variable(
+        self, variables: dict[str, SetVariable]
+    ) -> tuple[str, SetVariable] | None:
+        undetermined = [
+            (name, var) for name, var in variables.items() if not var.is_determined()
+        ]
+        if not undetermined:
             return None
 
-        priority_vars = []
-        for var in undetermined_vars:
-            if var in unsatisfied_vars and var in invalid_vars:
-                priority_vars.append((var, 0))
-            elif var in unsatisfied_vars:
-                priority_vars.append((var, 1))  #
-            elif var in invalid_vars:
-                priority_vars.append((var, 2))
-            else:
-                priority_vars.append((var, 3))
-
-        if priority_vars:
-            var, _ = min(
-                priority_vars, key=lambda x: (x[1], len(x[0].undetermined), x[0].name)
-            )
-            return var
-
-        return min(undetermined_vars, key=lambda x: (len(x.undetermined), x.name))
-
-    def solve(self, num_solutions: int = 1) -> List[Dict[str, SetVariable]]:
-        self.metrics.start_measurement()
-
-        self.logger.info("\nStarting filtering phase...")
-        if self.filter():
-            print(self.show_state())
-
-            self.logger.info("\nStarting enumeration...")
-            self.logger.info(
-                f"Searching for {'all' if num_solutions == 0 else num_solutions} solutions"
-            )
-
-            solutions = self._enumerate(num_solutions)
-            self.metrics.stop_measurement()
-            self.logger.info(self.metrics.get_report())
-            return solutions
+        strategy = self.options["variable_strategy"]
+        if isinstance(strategy, VariableStrategy):
+            strategy = strategy.value
+        if strategy == VariableStrategy.RANDOM.value:
+            return random.choice(undetermined)
+        elif strategy == VariableStrategy.FIRST.value:
+            return undetermined[0]
         else:
-            self.logger.error("Problem is inconsistent after initial filtering")
-            self.metrics.stop_measurement()
-            return []
+            sorted_vars = None
+            if strategy == VariableStrategy.SMALLEST_DOMAIN.value:
+                sorted_vars = sorted(
+                    undetermined, key=lambda x: len(x[1].upper_bound - x[1].lower_bound)
+                )
 
-    def _get_state_signature(self) -> tuple:
-        return tuple(
-            (name, frozenset(var.lower_bound), frozenset(var.upper_bound))
-            for name, var in sorted(self.variables.items())
+            elif strategy == VariableStrategy.LEAST_CONSTRAINED.value:
+                sorted_vars = sorted(
+                    undetermined, key=lambda x: self.get_variable_constraints(x[0])
+                )
+
+            elif strategy == VariableStrategy.MOST_CONSTRAINED.value:
+                sorted_vars = sorted(
+                    undetermined,
+                    key=lambda x: self.get_variable_constraints(x[0]),
+                    reverse=True,
+                )
+            else:
+                return undetermined[0]
+
+            if not sorted_vars:
+                return None
+            if (
+                len(sorted_vars) <= 1
+                or self.metrics.random_choices >= 10 * self.metrics.restart_count
+            ):
+                return sorted_vars[0]
+            else:
+                print("random choice")
+                self.metrics.random_choices += 1
+                self.metrics.global_random_choices += 1
+                if self.restarting_strategy == RestartingStrategy.NEXT:
+                    return sorted_vars[
+                        self.metrics.restart_count % (len(sorted_vars) - 1)
+                    ]
+                elif self.restarting_strategy == RestartingStrategy.RANDOM:
+                    return random.choice(sorted_vars)
+                elif self.restarting_strategy == RestartingStrategy.CONSTRAINED_RANDOM:
+                    return random.choice(
+                        sorted_vars[
+                            min(len(sorted_vars) - 1, self.metrics.restart_count) : min(
+                                len(sorted_vars) - 1, self.metrics.restart_count * 2
+                            )
+                        ]
+                    )
+                else:
+                    print("EROORORORO")
+
+    def handle_interrupt(self, signum: int, frame: object) -> None:
+        self.metrics.pretty_print(interrupted=True)
+        if self.visualizer:
+            self.visualizer.build_from_history(
+                self.operation_history,
+                self.solution_path,
+                self.variables,
+                self.constraints,
+            )
+            self.visualizer.save(f"search_tree_{time.strftime('%Y%m%d_%H%M%S')}")
+        sys.exit(1)
+
+    def solve(self) -> dict[str, set] | None:
+        self.state_computer = StateComputer(
+            self.metrics, constraints=self.constraints, initial_variables=self.variables
         )
 
-    def _check_early_failure(self) -> bool:
-        for constraint in self.constraints:
-            if not constraint.evaluate():
-                vars = constraint.get_variables()
-                if all(var.undetermined for var in vars):
-                    return True
+        try:
+            while not self.restarting:
+                try:
+                    self.restarting = False
 
+                    solution = self._solve([])
+
+                    if self.visualizer:
+                        self.visualizer.build_from_history(
+                            self.operation_history,
+                            self.solution_path,
+                            self.variables,
+                            self.constraints,
+                        )
+                        self.visualizer.save(
+                            f"search_tree_{time.strftime('%Y%m%d_%H%M%S')}"
+                        )
+                    self.metrics.pretty_print(interrupted=False)
+                    return solution
+                except Restarting:
+                    ...
+        except KeyboardInterrupt:
+
+            if self.visualizer:
+                self.visualizer.build_from_history(
+                    self.operation_history,
+                    self.solution_path,
+                    self.variables,
+                    self.constraints,
+                )
+                self.visualizer.save(f"search_tree_{time.strftime('%Y%m%d_%H%M%S')}")
+            self.metrics.pretty_print(interrupted=True)
+            return None
+
+    def _restart(self, current_path):
+        if self.metrics.max_depth_hits >= 15:
+            self.metrics.current_depth = 0
+            self.metrics.max_depth = 0
+            self.metrics.max_depth_hits = 0
+            self.visited_states.clear()
+            self.operation_history.clear()
+            self.solution_path.clear()
+            self.metrics.restart_count += 1
+            self.metrics.random_choices = 0
+            raise Restarting()
         return False
 
-    def constraints_state(self) -> list[tuple[Constraint, bool]]:
-        return [(constraint, constraint.evaluate()) for constraint in self.constraints]
+    def _choose_value(self, var: SetVariable) -> list[int]:
+        undetermined = list(var.upper_bound - var.lower_bound)
 
-    def _enumerate(
-        self, num_solutions: int | float = 0
-    ) -> List[Dict[str, SetVariable]]:
-        if num_solutions == 0:
-            num_solutions = math.inf
+        strategy = self.options.get("value_strategy", VariableValueStrategy.SIMPLE)
+        if isinstance(strategy, VariableValueStrategy):
+            strategy = strategy.value
 
-        solutions = []
-        self.failed_states = set()
+        if strategy == VariableValueStrategy.RANDOM:
+            random.shuffle(undetermined)
+            return undetermined
 
-        def recursive_enumerate(solver: SetSolver) -> bool:
-            solver.metrics.nodes_explored += 1
-            solver.metrics.update_memory_usage()
+        elif strategy == VariableValueStrategy.LOWEST_FREQUENCY:
+            return sorted(
+                undetermined,
+                key=lambda x: self.metrics.var_value_frequency.get(var.name, {}).get(
+                    x, 0
+                ),
+            )
+        return undetermined
 
-            enum_start = time.time()
-
-            if solver._check_early_failure():
-                solver.metrics.early_failures += 1
-                return False
-
-            state_sig = solver._get_state_signature()
-            if state_sig in solver.failed_states:
-                solver.metrics.cache_hits += 1
-                return False
-
-            all_constraints_satisfied = all(
-                constraint.evaluate() for constraint in solver.constraints
+    def _solve(self, current_path: list[Operation]) -> dict[str, set] | None:
+        try:
+            if not self.restarting:
+                self.metrics.branches += 1
+            print(
+                f"Branches: {self.metrics.branches:,d} | "
+                f"Max Depth: {self.metrics.max_depth} | "
+                f"Current Depth: {self.metrics.current_depth} | "
+                f"Max Depth Hits: {self.metrics.max_depth_hits}",
+                self._restart(current_path),
+                len(current_path),
             )
 
-            all_var_valid = all(var.is_valid() for var in solver.variables.values())
-
-            if all_constraints_satisfied and all_var_valid:
-                solution = {name: var.copy() for name, var in solver.variables.items()}
-                solutions.append(solution)
-                solver.metrics.solutions_found += 1
-                return len(solutions) >= num_solutions
-
-            var = solver._choose_variable()
-            if not var:
-                solver.failed_states.add(state_sig)
-                return False
-
-            value = min(var.undetermined)
-
-            solver_with = solver._create_branch(var.name, value, include=True)
-            if solver_with:
-                enum_end = time.time()
-                solver.metrics.add_enumeration_time(enum_end - enum_start)
-                if solver_with.filter():
-                    enum_start = time.time()
-                    if recursive_enumerate(solver_with):
-                        solver.metrics.backtracks += 1
-                        return True
-
-            solver_without = solver._create_branch(var.name, value, include=False)
-            if solver_without:
-                enum_end = time.time()
-                solver.metrics.add_enumeration_time(enum_end - enum_start)
-                if solver_without.filter():
-                    enum_start = time.time()
-                    if recursive_enumerate(solver_without):
-                        solver.metrics.backtracks += 1
-                        return True
-
-            solver.failed_states.add(state_sig)
-            return False
-
-        recursive_enumerate(self)
-        return solutions
-
-    def _create_branch(
-        self, var_name: str, value: int, include: bool
-    ) -> "SetSolver | None":
-        new_solver = SetSolver(
-            log_level=self.logger.log_level, shared_metrics=self.metrics
-        )
-
-        for name, var in self.variables.items():
-            new_var = var.copy()
-            if name == var_name:
-                if include:
-                    new_var.lower_bound.add(value)
-                else:
-                    new_var.upper_bound.remove(value)
-                if not new_var.is_consistent():
-                    return None
-            if var.is_consistent() and not new_var.is_consistent():
+            if self._restart(current_path):
+                self.metrics.current_depth = len(current_path)
                 return None
-            new_solver.variables[name] = new_var
+            path_tuple = tuple(current_path)
 
-        for constraint in self.constraints:
-            new_solver.add_constraint(
-                constraint.copy_with_new_variables(new_solver.variables)
-            )
+            if path_tuple in self.visited_states:
+                return None
+            self.visited_states.add(path_tuple)
 
-        return new_solver
+            try:
+                current_state = self.state_computer.compute_state(path_tuple)
+            except ValueError:
+                return None
+
+            self.metrics.current_depth = len(current_path)
+            if self.metrics.current_depth > self.metrics.max_depth:
+                self.metrics.max_depth_hits = 0
+                self.metrics.max_depth = self.metrics.current_depth
+                if self.metrics.global_max_depth < self.metrics.max_depth:
+                    self.metrics.global_max_depth = self.metrics.max_depth
+
+            if all(
+                constraint.evaluate(current_state) for constraint in self.constraints
+            ):
+                solution = {
+                    name: var.lower_bound for name, var in current_state.items()
+                }
+                self.metrics.solution = solution
+                self.solution_path = current_path.copy()
+                return solution
+
+            var_tuple = self.choose_variable(current_state)
+            if var_tuple is None:
+                return None
+
+            var_name, var = var_tuple
+            elements = self._choose_value(var)
+
+            for element in elements:
+                if not self.restarting:
+                    self.metrics.var_value_frequency[var_name][element] += 1
+                add_op = Operation(
+                    var_name, OperationType.ADD, element, len(current_path)
+                )
+                self.operation_history.append(add_op)
+                solution = self._solve(current_path + [add_op])
+
+                if solution:
+                    return solution
+
+                remove_op = Operation(
+                    var_name, OperationType.REMOVE, element, len(current_path)
+                )
+                self.operation_history.append(remove_op)
+                solution = self._solve(current_path + [remove_op])
+
+                if solution:
+                    return solution
+
+            if self.metrics.current_depth == self.metrics.max_depth:
+                self.metrics.max_depth_hits += 1
+
+            self.metrics.current_depth -= 1
+            return None
+
+        except KeyboardInterrupt:
+            if self.visualizer:
+                self.visualizer.build_from_history(
+                    self.operation_history,
+                    self.solution_path,
+                    self.variables,
+                    self.constraints,
+                )
+                self.visualizer.save(f"search_tree_{time.strftime('%Y%m%d_%H%M%S')}")
+            self.metrics.pretty_print(interrupted=True)
+            sys.exit(1)
