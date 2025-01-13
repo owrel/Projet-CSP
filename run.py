@@ -4,15 +4,16 @@ from src import (
     IntersectionConstraintCardinality,
     SetVariable,
     Different,
+    VariableStrategy,
 )
-from src.constraints import Subset
+from src.constraints import LexicographicOrdering, Subset
 
 
 def solve_social_golfer(num_groups, group_size, num_weeks):
     total_golfers = num_groups * group_size
     all_players = set(range(total_golfers))
 
-    solver = SetSolver(options={"visualize": False})
+    solver = SetSolver(visualize=False)
 
     # Initialize group sets for each week
     week_groups = {}
@@ -37,6 +38,11 @@ def solve_social_golfer(num_groups, group_size, num_weeks):
             for g2 in week_members[i + 1 :]:
                 solver.add_constraint(IntersectionConstraintCardinality(g1, g2, 0))
 
+    # Add lexicographic ordering between weeks
+    # This breaks symmetry between weeks
+    for w in range(num_weeks - 1):
+        solver.add_constraint(LexicographicOrdering(f"W{w}G0", f"W{w+1}G0"))
+
     # Players can't be grouped together more than once
     for w1, w2 in [
         (i, j) for i in range(num_weeks - 1) for j in range(i + 1, num_weeks)
@@ -47,9 +53,14 @@ def solve_social_golfer(num_groups, group_size, num_weeks):
             solver.add_constraint(
                 IntersectionConstraintCardinality(g1_name, g2_name, 1)
             )
-    # solver.visualize_constraint_graph()
+
+    # Force player 0 to always be in first group of each week
+    # This further breaks symmetry
+    # for w in range(num_weeks):
+    #     first_group = week_groups[f"W{w}G0"]
+    #     first_group._lower_bound.add(0)
+
     result = solver.solve()
-    print(solver.metrics.pretty_print())
     print(result)
     return result
 
@@ -78,14 +89,14 @@ def test_strategies():
     results = {}
 
     for strategy in [
-        "first",
-        "smallest_domain",
-        "most_constrained",
-        "least_constrained",
+        VariableStrategy.FIRST,
+        VariableStrategy.SMALLEST_DOMAIN,
+        VariableStrategy.MOST_CONSTRAINED,
+        VariableStrategy.LEAST_CONSTRAINED,
     ]:
         print(f"\nTesting strategy: {strategy}")
 
-        solver = SetSolver({"variable_strategy": strategy, "visualize": True})
+        solver = SetSolver(variable_strategy=strategy, visualize=True)
 
         # Create variables with significantly different domain sizes
         v1 = SetVariable("V1", lower_bound=set(), upper_bound={1, 2, 3, 4, 5})
@@ -136,5 +147,5 @@ def test_strategies():
 
 
 if __name__ == "__main__":
-    solve_social_golfer(group_size=2, num_groups=3, num_weeks=2)
+    solve_social_golfer(group_size=2, num_groups=3, num_weeks=3)
     # test_strategies()

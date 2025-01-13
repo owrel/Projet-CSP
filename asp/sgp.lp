@@ -1,6 +1,6 @@
-#const weeks = 3.
+#const players_per_group = 3.
 #const groups = 3.
-#const players_per_group = 2.
+#const weeks = 3.
 
 
 golfer(1..G) :- G = groups * players_per_group.

@@ -19,6 +19,7 @@ class VariableStrategy(Enum):
     LEAST_CONSTRAINED = "least_constrained"
     MOST_CONSTRAINED = "most_constrained"
     RANDOM = "random"
+    CUSTOM_ORDER = "custom_order"
 
 
 class VariableValueStrategy(Enum):
@@ -34,25 +35,31 @@ class RestartingStrategy(Enum):
 
 
 class SetSolver:
-    def __init__(self, options: dict | None = None) -> None:
-        default_options = {
-            "variable_strategy": VariableStrategy.SMALLEST_DOMAIN,
-            "visualize": False,
-        }
-        self.options: dict = {**default_options, **(options or {})}
+    def __init__(
+        self,
+        variable_strategy: VariableStrategy = VariableStrategy.SMALLEST_DOMAIN,
+        value_strategy: VariableValueStrategy = VariableValueStrategy.RANDOM,
+        restarting_strategy: RestartingStrategy = RestartingStrategy.CONSTRAINED_RANDOM,
+        custom_order: list[str] | None = None,
+        visualize: bool = False,
+    ) -> None:
+        self.variable_strategy = variable_strategy
+        self.value_strategy = value_strategy
+        self.restarting_strategy = restarting_strategy
+        self.custom_order = custom_order or []
+        self.visualize = visualize
+
         self.variables: dict[str, SetVariable] = {}
         self.constraints: list[Constraint] = []
         self.metrics = SolverMetrics()
         self.visualizer: SetTreeVisualizer | None = (
-            SetTreeVisualizer() if options and options["visualize"] else None
+            SetTreeVisualizer() if visualize else None
         )
         self.operation_history: list[Operation] = []
         self.solution_path: list[Operation] = []
         self.visited_states: set[tuple[Operation, ...]] = set()
         self.state_computer: StateComputer
         self.restarting = False
-
-        self.restarting_strategy: RestartingStrategy = RestartingStrategy.RANDOM
 
         signal.signal(signal.SIGINT, self.handle_interrupt)
 
@@ -90,26 +97,65 @@ class SetSolver:
         if not undetermined:
             return None
 
-        strategy = self.options["variable_strategy"]
-        if isinstance(strategy, VariableStrategy):
-            strategy = strategy.value
-        if strategy == VariableStrategy.RANDOM.value:
+        if self.variable_strategy == VariableStrategy.CUSTOM_ORDER:
+            ordered_vars = []
+            for var_name in self.custom_order:
+                for name, var in undetermined:
+                    if name == var_name:
+                        ordered_vars.append((name, var))
+                        break
+            remaining_vars = [
+                (name, var)
+                for name, var in undetermined
+                if name not in self.custom_order
+            ]
+            ordered_vars.extend(remaining_vars)
+
+            if not ordered_vars:
+                return None
+
+            if (
+                len(ordered_vars) <= 1
+                or self.metrics.random_choices >= 10 * self.metrics.restart_count
+            ):
+                return ordered_vars[0]
+            else:
+                print("random choice")
+                self.metrics.random_choices += 1
+                self.metrics.global_random_choices += 1
+
+                if self.restarting_strategy == RestartingStrategy.NEXT:
+                    return ordered_vars[
+                        self.metrics.restart_count % (len(ordered_vars) - 1)
+                    ]
+                elif self.restarting_strategy == RestartingStrategy.RANDOM:
+                    return random.choice(ordered_vars)
+                elif self.restarting_strategy == RestartingStrategy.CONSTRAINED_RANDOM:
+                    return random.choice(
+                        ordered_vars[
+                            min(
+                                len(ordered_vars) - 1, self.metrics.restart_count
+                            ) : min(len(ordered_vars), self.metrics.restart_count * 2)
+                        ]
+                    )
+
+        elif self.variable_strategy == VariableStrategy.RANDOM:
             return random.choice(undetermined)
-        elif strategy == VariableStrategy.FIRST.value:
+        elif self.variable_strategy == VariableStrategy.FIRST:
             return undetermined[0]
         else:
             sorted_vars = None
-            if strategy == VariableStrategy.SMALLEST_DOMAIN.value:
+            if self.variable_strategy == VariableStrategy.SMALLEST_DOMAIN:
                 sorted_vars = sorted(
                     undetermined, key=lambda x: len(x[1].upper_bound - x[1].lower_bound)
                 )
 
-            elif strategy == VariableStrategy.LEAST_CONSTRAINED.value:
+            elif self.variable_strategy == VariableStrategy.LEAST_CONSTRAINED:
                 sorted_vars = sorted(
                     undetermined, key=lambda x: self.get_variable_constraints(x[0])
                 )
 
-            elif strategy == VariableStrategy.MOST_CONSTRAINED.value:
+            elif self.variable_strategy == VariableStrategy.MOST_CONSTRAINED:
                 sorted_vars = sorted(
                     undetermined,
                     key=lambda x: self.get_variable_constraints(x[0]),
@@ -139,7 +185,7 @@ class SetSolver:
                     return random.choice(
                         sorted_vars[
                             min(len(sorted_vars) - 1, self.metrics.restart_count) : min(
-                                len(sorted_vars) - 1, self.metrics.restart_count * 2
+                                len(sorted_vars), self.metrics.restart_count * 2
                             )
                         ]
                     )
@@ -198,7 +244,7 @@ class SetSolver:
             return None
 
     def _restart(self, current_path):
-        if self.metrics.max_depth_hits >= 15:
+        if self.metrics.max_depth_hits >= 10 + self.metrics.max_depth:
             self.metrics.current_depth = 0
             self.metrics.max_depth = 0
             self.metrics.max_depth_hits = 0
@@ -213,15 +259,11 @@ class SetSolver:
     def _choose_value(self, var: SetVariable) -> list[int]:
         undetermined = list(var.upper_bound - var.lower_bound)
 
-        strategy = self.options.get("value_strategy", VariableValueStrategy.SIMPLE)
-        if isinstance(strategy, VariableValueStrategy):
-            strategy = strategy.value
-
-        if strategy == VariableValueStrategy.RANDOM:
+        if self.value_strategy == VariableValueStrategy.RANDOM:
             random.shuffle(undetermined)
             return undetermined
 
-        elif strategy == VariableValueStrategy.LOWEST_FREQUENCY:
+        elif self.value_strategy == VariableValueStrategy.LOWEST_FREQUENCY:
             return sorted(
                 undetermined,
                 key=lambda x: self.metrics.var_value_frequency.get(var.name, {}).get(
@@ -239,8 +281,6 @@ class SetSolver:
                 f"Max Depth: {self.metrics.max_depth} | "
                 f"Current Depth: {self.metrics.current_depth} | "
                 f"Max Depth Hits: {self.metrics.max_depth_hits}",
-                self._restart(current_path),
-                len(current_path),
             )
 
             if self._restart(current_path):
