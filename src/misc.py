@@ -1,7 +1,6 @@
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum, auto
-import random
 import time
 import tracemalloc
 from typing import Callable
@@ -34,11 +33,25 @@ class Operation:
         return f"{self.variable} {symbol} {self.value}"
 
 
+@dataclass(frozen=True)
+class NoGood:
+    assignments: frozenset[tuple[str, bool, int]]  # (variable, is_included, value)
+
+    def __str__(self):
+        parts = []
+        for var, is_included, val in self.assignments:
+            symbol = "∈" if is_included else "∉"
+            parts.append(f"{val} {symbol} {var}")
+        return " ∧ ".join(parts)
+
+
 class SolverMetrics:
     def __init__(self):
         tracemalloc.start()
         self.start_time = time.time()
         self.solution: dict[str, set[int]] = {}
+        self.nogoods_learned = 0
+        self.nogood_hits = 0
         self.var_value_frequency: dict[str, dict[int, int]] = {}
         self.branches = 0
         self.max_depth = 0
@@ -48,7 +61,7 @@ class SolverMetrics:
         self.random_choices = 0
         self.global_random_choices = 0
         self.initial_memory = psutil.Process().memory_info().rss
-        self.max_depth_hits = 0
+        self.max_depth_hits: float = 0
         self.cache_hits = 0
         self.skipped_propagations = 0
 
@@ -60,6 +73,10 @@ class SolverMetrics:
         print(f"# of restarts: {self.restart_count}")
         print(f"Random choices made : {self.global_random_choices}")
         print(f"Cache hits : {self.cache_hits}")
+        print(f"No-goods Learned : {self.nogoods_learned}")
+
+        print(f"No-goods hits : {self.nogood_hits}")
+
         print(f"Skipped propagations: {self.skipped_propagations}")
 
         current, peak = tracemalloc.get_traced_memory()
@@ -89,7 +106,7 @@ class StateComputer:
         self._cache = {}
         self._constraint_map = self._build_constraint_map()
         self.skip_propagation_func: Callable[[StateComputer], bool] = (
-            skip_propagation_func or (lambda x: random.random() < 0.2)
+            skip_propagation_func or (lambda x: False)
         )
 
     def _build_constraint_map(self):
@@ -101,7 +118,7 @@ class StateComputer:
                 constraint_map[var].append(constraint)
         return constraint_map
 
-    def compute_state_old(
+    def compute_state_(
         self, operations: tuple[Operation, ...]
     ) -> dict[str, SetVariable]:
         cache_key = tuple(
@@ -162,12 +179,12 @@ class StateComputer:
                 var = current_state[op.variable]
 
                 if op.op_type == OperationType.ADD:
-                    if op.value in var._lower_bound:
-                        var._lower_bound.add(op.value)
+                    # if op.value in var._lower_bound:
+                    var._lower_bound.add(op.value)
                 else:
-                    if op.value in var._upper_bound:
+                    # if op.value in var._upper_bound:
 
-                        var._upper_bound.remove(op.value)
+                    var._upper_bound.remove(op.value)
 
                 propagation_queue = deque()
                 if op.variable in self._constraint_map:
@@ -196,12 +213,8 @@ class StateComputer:
         processed = set()
 
         if not self.skip_propagation_func(self):
-
             while propagation_queue:
                 constraint = propagation_queue.popleft()
-                if constraint in processed:
-                    continue
-
                 changed_vars = constraint.filter_domains(current_state)
                 if changed_vars:
                     for var in changed_vars:

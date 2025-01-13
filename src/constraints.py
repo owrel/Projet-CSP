@@ -56,6 +56,47 @@ class Union(Constraint):
         return [self.var1, self.var2, self.result]
 
 
+class Difference(Constraint):
+    """Constraint: result = var1 - var2"""
+
+    def __init__(self, var1, var2, result):
+        self.var1 = var1
+        self.var2 = var2
+        self.result = result
+
+    def __str__(self):
+        return f"{self.var1} - {self.var2} = {self.result}"
+
+    def filter_domains(self, variables) -> set[str]:
+        changed = set()
+
+        # Upper bound: var1 - var2 subset of var1
+        new_upper = (
+            variables[self.var1]._upper_bound - variables[self.var2]._lower_bound
+        )
+        if not variables[self.result]._upper_bound.issuperset(new_upper):
+            variables[self.result]._upper_bound = new_upper
+            changed.add(self.result)
+
+        # Lower bound: var1 - upper_bound(var2)
+        new_lower = (
+            variables[self.var1]._lower_bound - variables[self.var2]._upper_bound
+        )
+        if not variables[self.result]._lower_bound.issuperset(new_lower):
+            variables[self.result]._lower_bound = new_lower
+            changed.add(self.result)
+
+        return changed
+
+    def evaluate(self, variables) -> bool:
+        return variables[self.result].lower_bound == (
+            variables[self.var1]._lower_bound - variables[self.var2]._lower_bound
+        )
+
+    def get_variables(self) -> list[str]:
+        return [self.var1, self.var2, self.result]
+
+
 class Intersection(Constraint):
     """Constraint: result = var1 ∩ var2"""
 
@@ -109,6 +150,14 @@ class Subset(Constraint):
 
     def filter_domains(self, variables) -> set[str]:
         changed = set()
+
+        if variables[self.var2].is_determined() and not variables[
+            self.var1
+        ]._upper_bound.issubset(variables[self.var2]._upper_bound):
+            raise ValueError(
+                f"Subset constraint violated: {self.var1}={variables[self.var1]._lower_bound} not subset of {self.var2}={variables[self.var2]._upper_bound}"
+            )
+
         new_upper1 = variables[self.var1]._upper_bound.intersection(
             variables[self.var2]._upper_bound
         )

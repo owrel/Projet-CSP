@@ -5,7 +5,7 @@ import random
 from enum import Enum
 
 from src.constraints import Constraint
-from src.misc import Operation, OperationType, SolverMetrics, StateComputer
+from src.misc import NoGood, Operation, OperationType, SolverMetrics, StateComputer
 from src.variables import SetVariable
 from .visualization import SetTreeVisualizer, ConstraintGraphVisualizer
 
@@ -38,11 +38,12 @@ class SetSolver:
     def __init__(
         self,
         variable_strategy: VariableStrategy = VariableStrategy.SMALLEST_DOMAIN,
-        value_strategy: VariableValueStrategy = VariableValueStrategy.RANDOM,
-        restarting_strategy: RestartingStrategy = RestartingStrategy.CONSTRAINED_RANDOM,
+        value_strategy: VariableValueStrategy = VariableValueStrategy.SIMPLE,
+        restarting_strategy: RestartingStrategy = RestartingStrategy.NEXT,
         custom_order: list[str] | None = None,
         visualize: bool = False,
     ) -> None:
+        self.nogoods: set[NoGood] = set()
         self.variable_strategy = variable_strategy
         self.value_strategy = value_strategy
         self.restarting_strategy = restarting_strategy
@@ -272,90 +273,121 @@ class SetSolver:
             )
         return undetermined
 
-    def _solve(self, current_path: list[Operation]) -> dict[str, set] | None:
-        try:
-            if not self.restarting:
-                self.metrics.branches += 1
-            print(
-                f"Branches: {self.metrics.branches:,d} | "
-                f"Max Depth: {self.metrics.max_depth} | "
-                f"Current Depth: {self.metrics.current_depth} | "
-                f"Max Depth Hits: {self.metrics.max_depth_hits}",
+    def _assignments_to_nogood(self, current_path: list[Operation]) -> NoGood:
+        relevant_assignments = set()
+        for op in reversed(current_path):
+            if not any(a[0] == op.variable for a in relevant_assignments):
+                relevant_assignments.add(
+                    (op.variable, op.op_type == OperationType.ADD, op.value)
+                )
+        return NoGood(frozenset(relevant_assignments))
+
+    def _violates_nogood(self, current_path: list[Operation]) -> bool:
+        current_assignments = {}
+        for op in current_path:
+            current_assignments[op.variable] = (
+                op.variable,
+                op.op_type == OperationType.ADD,
+                op.value,
             )
+        current_set = set(current_assignments.values())
 
-            if self._restart(current_path):
-                self.metrics.current_depth = len(current_path)
-                return None
-            path_tuple = tuple(current_path)
+        for nogood in self.nogoods:
+            matches = True
+            for assignment in nogood.assignments:
+                var = assignment[0]
+                if var in current_assignments:
+                    if current_assignments[var] != assignment:
+                        matches = False
+                        break
+                else:
+                    matches = False
+                    break
+            if matches:
+                self.metrics.nogood_hits += 1
+                return True
+        return False
 
-            if path_tuple in self.visited_states:
-                return None
-            self.visited_states.add(path_tuple)
+    def _learn_nogood(self, failed_path: list[Operation]):
+        if failed_path:
+            nogood = self._assignments_to_nogood(failed_path)
+            if nogood not in self.nogoods:
+                self.nogoods.add(nogood)
+                self.metrics.nogoods_learned += 1
 
-            try:
-                current_state = self.state_computer.compute_state(path_tuple)
-            except ValueError:
-                return None
-
-            self.metrics.current_depth = len(current_path)
-            if self.metrics.current_depth > self.metrics.max_depth:
-                self.metrics.max_depth_hits = 0
-                self.metrics.max_depth = self.metrics.current_depth
-                if self.metrics.global_max_depth < self.metrics.max_depth:
-                    self.metrics.global_max_depth = self.metrics.max_depth
-
-            if all(
-                constraint.evaluate(current_state) for constraint in self.constraints
-            ):
-                solution = {
-                    name: var.lower_bound for name, var in current_state.items()
-                }
-                self.metrics.solution = solution
-                self.solution_path = current_path.copy()
-                return solution
-
-            var_tuple = self.choose_variable(current_state)
-            if var_tuple is None:
-                return None
-
-            var_name, var = var_tuple
-            elements = self._choose_value(var)
-
-            for element in elements:
-                if not self.restarting:
-                    self.metrics.var_value_frequency[var_name][element] += 1
-                add_op = Operation(
-                    var_name, OperationType.ADD, element, len(current_path)
-                )
-                self.operation_history.append(add_op)
-                solution = self._solve(current_path + [add_op])
-
-                if solution:
-                    return solution
-
-                remove_op = Operation(
-                    var_name, OperationType.REMOVE, element, len(current_path)
-                )
-                self.operation_history.append(remove_op)
-                solution = self._solve(current_path + [remove_op])
-
-                if solution:
-                    return solution
-
-            if self.metrics.current_depth == self.metrics.max_depth:
-                self.metrics.max_depth_hits += 1
-
-            self.metrics.current_depth -= 1
+    def _solve(self, current_path: list[Operation]) -> dict[str, set] | None:
+        if self._violates_nogood(current_path):
             return None
 
-        except KeyboardInterrupt:
-            if self.visualizer:
-                self.visualizer.build_from_history(
-                    self.operation_history,
-                    self.solution_path,
-                    self.variables,
-                    self.constraints,
-                )
-                self.visualizer.save(f"search_tree_{time.strftime('%Y%m%d_%H%M%S')}")
-            self.metrics.pretty_print(interrupted=True)
-            sys.exit(1)
+        if not self.restarting:
+            self.metrics.branches += 1
+        print(
+            f"Branches: {self.metrics.branches:,d} | "
+            f"Max Depth: {self.metrics.max_depth} | "
+            f"Current Depth: {self.metrics.current_depth} | "
+            f"Max Depth Hits: {int(self.metrics.max_depth_hits)}",
+        )
+
+        if self._restart(current_path):
+            self.metrics.current_depth = len(current_path)
+            return None
+        path_tuple = tuple(current_path)
+
+        if path_tuple in self.visited_states:
+            return None
+        self.visited_states.add(path_tuple)
+
+        try:
+            current_state = self.state_computer.compute_state(path_tuple)
+        except ValueError:
+            self._learn_nogood(current_path)
+            return None
+
+        self.metrics.current_depth = len(current_path)
+        if self.metrics.current_depth > self.metrics.max_depth:
+            self.metrics.max_depth_hits = 0
+            self.metrics.max_depth = self.metrics.current_depth
+            if self.metrics.global_max_depth < self.metrics.max_depth:
+                self.metrics.global_max_depth = self.metrics.max_depth
+
+        if all(constraint.evaluate(current_state) for constraint in self.constraints):
+            solution = {name: var.lower_bound for name, var in current_state.items()}
+            self.metrics.solution = solution
+            self.solution_path = current_path.copy()
+            return solution
+
+        var_tuple = self.choose_variable(current_state)
+        if var_tuple is None:
+            self._learn_nogood(current_path)
+            print("Qwdqdwqwsdqdwqwdq\n\n\n\n")
+            return None
+
+        var_name, var = var_tuple
+        elements = self._choose_value(var)
+
+        for element in elements:
+            if not self.restarting:
+                self.metrics.var_value_frequency[var_name][element] += 1
+            add_op = Operation(var_name, OperationType.ADD, element, len(current_path))
+            self.operation_history.append(add_op)
+            solution = self._solve(current_path + [add_op])
+
+            if solution:
+                return solution
+
+            remove_op = Operation(
+                var_name, OperationType.REMOVE, element, len(current_path)
+            )
+            self.operation_history.append(remove_op)
+            solution = self._solve(current_path + [remove_op])
+
+            if solution:
+                return solution
+
+        if self.metrics.current_depth == self.metrics.max_depth:
+            self.metrics.max_depth_hits += 1
+        elif self.metrics.current_depth + 10 >= self.metrics.max_depth:
+            self.metrics.max_depth_hits += 0.1
+
+        self.metrics.current_depth -= 1
+        return None
