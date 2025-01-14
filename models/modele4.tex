@@ -1,0 +1,68 @@
+\documentclass{article}
+\usepackage{amsmath} % for math environments
+\usepackage{amsfonts} % for math fonts
+\usepackage{amssymb} % for math symbols
+
+\begin{document}
+
+\section*{Modélisation du Problème des Golfeurs Sociaux}
+
+Le problème des golfeurs sociaux est formulé comme suit : un groupe de golfeurs doit être divisé en plusieurs groupes chaque semaine, de manière à ce que chaque golfeur ne joue pas plus d'une fois avec n'importe quel autre golfeur au cours de plusieurs semaines.
+
+\begin{itemize}
+\item \textbf Nous développons un modèle basé sur des contraintes ensemblistes et examinons l'efficacité des techniques de rupture de symétrie dans la réduction du nombre de solutions redondantes et l'amélioration des performances de résolution.
+\end{itemize}
+
+\subsection*{Paramètres et Variables}
+\begin{itemize}
+  \item \( W \) : le nombre de semaines.
+  \item \( G \) : le nombre de groupes chaque semaine.
+  \item \( P \) : le nombre de golfeurs par groupe, avec \( Q = G \times P \) comme nombre total de golfeurs.
+  \item \textbf{Variables :} Un tableau \( S \) où \( S[w, g] \) représente l'ensemble des golfeurs dans le groupe \( g \) pendant la semaine \( w \).
+\end{itemize}
+
+\subsection*{Contraintes}
+\begin{enumerate}
+  \item \textbf{Taille des Groupes :} Chaque groupe \( g \) pendant chaque semaine \( w \) doit contenir exactement \( P \) golfeurs.
+    \[
+    \forall w \in \{0, \ldots, W-1\}, \forall g \in \{0, \ldots, G-1\}, \quad \text{card}(S[w,g]) = P
+    \]
+
+  \item \textbf{Participation Hebdomadaire :} Chaque golfeur doit jouer exactement une fois par semaine.
+    \[
+    \forall w \in \{0, \ldots, W-1\}, \quad \text{card}\left(\bigcup_{g=0}^{G-1} S[w,g]\right) = Q
+    \]
+
+  \item \textbf{Rencontres Uniques :} Chaque golfeur ne doit rencontrer chaque autre golfeur qu'au maximum une fois au cours de toutes les semaines.
+    \[
+    \forall q1, q2 \in \{0, \ldots, Q-1\} \text{ where } q1 < q2, \quad \sum_{w1=0}^{W-1} \sum_{w2=w1}^{W-1} \sum_{g1=0}^{G-1} \sum_{g2=(w1==w2?g1+1:0)}^{G-1} \text{min}(P, \text{card}(S[w1,g1] \cap S[w2,g2])) \leq 1
+    \]
+\end{enumerate}
+
+\subsection*{Techniques de Rupture de Symétrie}
+Pour optimiser la résolution du problème, plusieurs techniques de cassage de symétrie sont utilisées :
+\begin{itemize}
+  \item \textbf{Première Semaine Standardisée :} Nous assignons des groupes fixes pour la première semaine pour réduire les permutations initiales inutiles.
+    \[
+    \forall g \in \{0, \ldots, G-1\}, \forall i \in \{0, \ldots, P-1\} : S[0, g] = S[0, g] \cup \{g \times P + i\}
+    \]
+
+  \item \textbf{Maintien des Golfeurs Principaux :} Dans les semaines suivantes, le premier golfeur de chaque groupe reste le même pour maintenir une continuité et limiter les reconfigurations possibles.
+    \[
+    \forall w \in \{1, \ldots, W-1\}, \forall g \in \{0, \ldots, P-1\} : g \in S[w, g]
+    \]
+
+  \item \textbf{Ordre des Maximums et Minimums :} Pour éviter les changements arbitraires entre les groupes d'une semaine à l'autre, nous imposons un ordre croissant des indices des golfeurs les plus élevés et les plus bas dans le premier groupe.
+    \[
+    \forall w1, w2 \in \{0, \ldots, W-1\} \text{ où } w1 < w2 : \max(S[w1,0]) \leq \max(S[w2,0]), \quad \min(S[w1,0] \setminus \{0\}) \leq \min(S[w2,0] \setminus \{0\})
+    \]
+\end{itemize}
+
+\section*{Résultats}
+\subsection{Configuration Expérimentale}
+Les tests sont réalisés sur un ensemble de données pour simuler divers scénarios du SGP
+
+\subsection{Analyse des Performances}
+Les résultats montrent que l'introduction de la rupture de symétrie réduit considérablement le nombre de solutions redondantes
+
+\end{document}
