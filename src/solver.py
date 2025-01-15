@@ -38,8 +38,8 @@ class SetSolver:
     def __init__(
         self,
         variable_strategy: VariableStrategy = VariableStrategy.SMALLEST_DOMAIN,
-        value_strategy: VariableValueStrategy = VariableValueStrategy.SIMPLE,
-        restarting_strategy: RestartingStrategy = RestartingStrategy.NEXT,
+        value_strategy: VariableValueStrategy = VariableValueStrategy.RANDOM,
+        restarting_strategy: RestartingStrategy = RestartingStrategy.CONSTRAINED_RANDOM,
         custom_order: list[str] | None = None,
         visualize: bool = False,
     ) -> None:
@@ -359,7 +359,6 @@ class SetSolver:
         var_tuple = self.choose_variable(current_state)
         if var_tuple is None:
             self._learn_nogood(current_path)
-            print("Qwdqdwqwsdqdwqwdq\n\n\n\n")
             return None
 
         var_name, var = var_tuple
@@ -388,6 +387,10 @@ class SetSolver:
             self.metrics.max_depth_hits += 1
         elif self.metrics.current_depth + 10 >= self.metrics.max_depth:
             self.metrics.max_depth_hits += 0.1
+        elif self.metrics.current_depth + 50 >= self.metrics.max_depth:
+            self.metrics.max_depth_hits += 0.05
+        elif self.metrics.current_depth + 100 >= self.metrics.max_depth:
+            self.metrics.max_depth_hits += 0.01
 
         self.metrics.current_depth -= 1
         return None
