@@ -94,8 +94,8 @@ def solve_social_golfer_simple_sym_break(num_groups, group_size, num_weeks):
 
     # Add lexicographic ordering between weeks
     # This breaks symmetry between weeks
-    for w in range(num_weeks - 1):
-        solver.add_constraint(LexicographicOrdering(f"W{w}G0", f"W{w+1}G0"))
+    # for w in range(num_weeks - 1):
+    #     solver.add_constraint(LexicographicOrdering(f"W{w}G0", f"W{w+1}G0"))
 
     # Players can't be grouped together more than once
     for w1, w2 in [
