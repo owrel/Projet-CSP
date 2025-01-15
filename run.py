@@ -56,9 +56,9 @@ def solve_social_golfer(num_groups, group_size, num_weeks):
 
     # Force player 0 to always be in first group of each week
     # This further breaks symmetry
-    for w in range(num_weeks):
-        first_group = week_groups[f"W{w}G0"]
-        first_group._lower_bound.add(0)
+    # for w in range(num_weeks):
+    #     first_group = week_groups[f"W{w}G0"]
+    #     first_group._lower_bound.add(0)
 
     result = solver.solve()
     print(result)

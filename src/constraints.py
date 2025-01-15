@@ -150,6 +150,7 @@ class Subset(Constraint):
 
     def filter_domains(self, variables) -> set[str]:
         changed = set()
+
         if variables[self.var2].is_determined() and not variables[
             self.var1
         ]._upper_bound.issubset(variables[self.var2]._upper_bound):
@@ -193,13 +194,9 @@ class Different(Constraint):
         return f"{self.var1} ≠ {self.var2}"
 
     def filter_domains(self, variables) -> set[str]:
-        if (
-            variables[self.var1].is_determined()
-            and variables[self.var2].is_determined()
-            and variables[self.var1]._lower_bound == variables[self.var2]._lower_bound
-        ):
+        if variables[self.var1]._lower_bound == variables[self.var2]._lower_bound:
             raise ValueError(
-                f"Different constraint violated: {self.var1}={variables[self.var1]._lower_bound} = {self.var2}={variables[self.var2]._lower_bound}"
+                f"Different constraint violated: {self.var1}={variables[self.var1]._lower_bound} equals {self.var2}={variables[self.var2]._lower_bound}"
             )
         return set()
 
@@ -280,13 +277,13 @@ class CardinalityConstraint(Constraint):
         # Check if lower bound is too large
         if len(var._lower_bound) > self.cardinality:
             raise ValueError(
-                f"Variable {self.var} lower bound {var._lower_bound} (size={len(var._lower_bound)}) exceeds cardinality {self.cardinality}"
+                f"Variable {self.var} lower bound {var._lower_bound} exceeds cardinality {self.cardinality}"
             )
 
         # Check if upper bound is too small to reach cardinality
         if len(var._upper_bound) < self.cardinality:
             raise ValueError(
-                f"Variable {self.var} upper bound {var._upper_bound} (size={len(var._upper_bound)}) too small to reach cardinality {self.cardinality}"
+                f"Variable {self.var} upper bound too small to reach cardinality {self.cardinality}"
             )
 
         # If lower bound reaches cardinality, fix the set
@@ -316,6 +313,44 @@ class CardinalityConstraint(Constraint):
 
     def get_variables(self) -> list[str]:
         return [self.var]
+
+
+class Equality(Constraint):
+    """Constraint: var1 = var2"""
+
+    def __init__(self, var1: str, var2: str):
+        self.var1 = var1
+        self.var2 = var2
+
+    def filter_domains(self, variables) -> set[str]:
+        changed = set()
+        var1, var2 = variables[self.var1], variables[self.var2]
+
+        # Update upper bounds
+        new_upper = var1._upper_bound.intersection(var2._upper_bound)
+        if var1._upper_bound != new_upper:
+            var1._upper_bound = new_upper
+            changed.add(self.var1)
+        if var2._upper_bound != new_upper:
+            var2._upper_bound = new_upper
+            changed.add(self.var2)
+
+        # Update lower bounds
+        new_lower = var1._lower_bound.union(var2._lower_bound)
+        if var1._lower_bound != new_lower:
+            var1._lower_bound = new_lower
+            changed.add(self.var1)
+        if var2._lower_bound != new_lower:
+            var2._lower_bound = new_lower
+            changed.add(self.var2)
+
+        return changed
+
+    def evaluate(self, variables) -> bool:
+        return variables[self.var1]._lower_bound == variables[self.var2]._lower_bound
+
+    def get_variables(self) -> list[str]:
+        return [self.var1, self.var2]
 
 
 class LexicographicOrdering(Constraint):
