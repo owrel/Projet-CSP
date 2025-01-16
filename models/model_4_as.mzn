@@ -54,7 +54,7 @@ constraint forall(w1, w2 in Weeks where w1 < w2 /\ P > 1) (
     min(S[w1,0] diff {0}) <= min(S[w2,0] diff {0})
 );
 
-% constraint on the order of golfers changing team except the "captains"
+% constraint on the order of golfers changing team except the first ones
 constraint forall(w1,w2 in Weeks, g1,g2 in 1..G-1 where g2 == g1+1 /\ P > 1 /\ w2 == w1+1) (
    card(S[w1,g1] intersect S[w2,g2]) > 0 /\
    card(S[w1,G-1] intersect S[w2,1]) > 0
